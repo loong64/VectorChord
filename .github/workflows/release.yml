@@ -1,0 +1,118 @@
+name: build(vchord)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        default: 'latest'
+        description: 'Package version'
+        type: string
+        required: true
+  schedule:
+    - cron: '0 20 * * *'
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  app_name: 'vchord'
+  app_repo: 'tensorchord/VectorChord'
+
+jobs:
+  check:
+    runs-on: ubuntu-slim
+    outputs:
+      app_version: ${{ steps.get-version.outputs.app_version }}
+      app_build: ${{ steps.check-release.outputs.app_build }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Get Version
+        id: get-version
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event.inputs.version }}" = "latest" ]; then
+            app_version=$(curl -s "https://api.github.com/repos/${{ env.app_repo }}/releases/latest" | jq -r .tag_name)
+          else
+            app_version=${{ github.event.inputs.version }}
+          fi
+          if [ -z "${app_version}" ] || [ "${app_version}" == "null" ]; then
+            echo "Failed to get version"
+            exit 1
+          fi
+          
+          echo "app_version=${app_version}" >> $GITHUB_ENV
+          echo "app_version=${app_version}" >> $GITHUB_OUTPUT
+          echo ""
+          echo "========== Build Args =========="
+          echo "app_version=${app_version}"
+
+      - name: Check Release
+        id: check-release
+        run: |
+          gh release view ${app_version} -R ${{ github.repository }} | grep postgresql-.*.zip >/dev/null 2>&1 || echo "app_build=1" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    if: needs.check.outputs.app_build == '1'
+    runs-on: ubuntu-latest
+    needs: check
+    env:
+      app_version: ${{ needs.check.outputs.app_version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['14', '15', '16', '17', '18']
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v4
+
+      - name: Build and push image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/loong64
+          load: true
+          push: false
+          build-args: |
+            TAG=${{ env.app_version }}
+            PG_MAJOR=${{ matrix.version }}
+          tags: |
+            ${{ env.app_name }}:${{ env.app_version }}
+          outputs: type=local,dest=./
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.app_name }}-${{ env.app_version }}
+          path: dist
+
+  release:
+    if: needs.check.outputs.app_build == '1'
+    runs-on: ubuntu-latest
+    needs:
+      - check
+      - build
+    env:
+      app_version: ${{ needs.check.outputs.app_version }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download release
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ${{ env.app_name }}-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${{ env.app_version }}"
+          gh release create "${TAG_NAME}" \
+            --generate-notes \
+            --title "${TAG_NAME}" \
+            dist/*
