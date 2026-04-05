@@ -26,14 +26,13 @@ RUN set -eux; \
 WORKDIR /opt/vectorchord
 RUN set -eux; \
 	mkdir -p /dist; \
-	export PGRX_PG_CONFIG_PATH=pg_config PG_CONFIG=pg_config; \
-	export SEMVER=${TAG} VERSION=${PG_MAJOR} ARCH=loongarch64 PLATFORM=loong64; \
-	mkdir -p ~/.pgrx; \
-	touch ~/.pgrx/config.toml; \
-	make PG_CONFIG=$PG_CONFIG build; \
-	(cd ./build/raw && zip -r /dist/postgresql-${VERSION}-vchord_${SEMVER}_${ARCH}-linux-gnu.zip .); \
-	make DESTDIR="./build/deb" install; \
-	mkdir -p ./build/deb/DEBIAN; \
+	make build; \
+	export SEMVER=${TAG} VERSION=${PG_MAJOR}; \
+    ARCH=$(uname -m); \
+	(cd ./build && zip -r /dist/postgresql-${VERSION}-vchord_${SEMVER}_${ARCH}-linux-gnu.zip .); \
+	make DESTDIR="~/debian" install; \
+    PLATFORM=$(dpkg --print-architecture); \
+	mkdir -p ~/debian/DEBIAN; \
 	{ \
 		echo "Package: postgresql-${VERSION}-vchord"; \
 		echo "Version: ${SEMVER}-1"; \
@@ -45,9 +44,9 @@ RUN set -eux; \
 		echo "Description: Vector database plugin for Postgres, written in Rust, specifically designed for LLM"; \
 		echo "Homepage: https://vectorchord.ai/"; \
 		echo "License: AGPL-3.0-only or Elastic-2.0"; \
-	} > ./build/deb/DEBIAN/control; \
-	(cd ./build/deb && find usr -type f -print0 | xargs -0 md5sum) > ./build/deb/DEBIAN/md5sums; \
-	dpkg-deb --root-owner-group -Zxz --build ./build/deb/ /dist/postgresql-${VERSION}-vchord_${SEMVER}-1_${PLATFORM}.deb;
+	} > ~/debian/DEBIAN/control; \
+	(cd ~/debian && find usr -type f -print0 | xargs -0 md5sum) > ~/debian/DEBIAN/md5sums; \
+	dpkg-deb --root-owner-group -Zxz --build ~/debian /dist/postgresql-${VERSION}-vchord_${SEMVER}-1_${PLATFORM}.deb
 
 FROM scratch
 COPY --from=builder /dist /dist
