@@ -86,7 +86,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ env.app_name }}-${{ env.app_version }}
+          name: ${{ env.app_name }}-${{ env.app_version }}-pg${{ matrix.version }}
           path: dist
 
   release:
