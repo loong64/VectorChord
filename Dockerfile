@@ -28,10 +28,10 @@ RUN set -eux; \
 	mkdir -p /dist; \
 	make build; \
 	export SEMVER=${TAG} VERSION=${PG_MAJOR}; \
-    ARCH=$(uname -m); \
+	ARCH=$(uname -m); \
 	(cd ./build && zip -r /dist/postgresql-${VERSION}-vchord_${SEMVER}_${ARCH}-linux-gnu.zip .); \
 	make DESTDIR="~/debian" install; \
-    PLATFORM=$(dpkg --print-architecture); \
+	PLATFORM=$(dpkg --print-architecture); \
 	mkdir -p ~/debian/DEBIAN; \
 	{ \
 		echo "Package: postgresql-${VERSION}-vchord"; \
@@ -43,7 +43,7 @@ RUN set -eux; \
 		echo "Maintainer: Tensorchord <support@tensorchord.ai>"; \
 		echo "Description: Vector database plugin for Postgres, written in Rust, specifically designed for LLM"; \
 		echo "Homepage: https://vectorchord.ai/"; \
-		echo "License: AGPL-3.0-only or Elastic-2.0"; \
+		echo "License: AGPL-3.0-only OR Elastic-2.0"; \
 	} > ~/debian/DEBIAN/control; \
 	(cd ~/debian && find usr -type f -print0 | xargs -0 md5sum) > ~/debian/DEBIAN/md5sums; \
 	dpkg-deb --root-owner-group -Zxz --build ~/debian /dist/postgresql-${VERSION}-vchord_${SEMVER}-1_${PLATFORM}.deb
