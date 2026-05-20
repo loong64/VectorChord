@@ -17,7 +17,7 @@ permissions:
 
 env:
   app_name: 'vchord'
-  app_repo: 'tensorchord/VectorChord'
+  app_repo: 'supervc-stack/VectorChord'
 
 jobs:
   check:
